@@ -33,6 +33,7 @@ Install dependencies
 yarn
 ```
 Start your challenge ! Check the contract in contracts/* and type your answer in test/*/*.challenge.js
+
 Test your answer
 ```
 yarn run <CHALLENGE_NAME>
