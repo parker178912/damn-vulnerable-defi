@@ -66,3 +66,39 @@ describe('[Challenge] Unstoppable', function () {
         ).to.be.reverted;
     });
 });
+```
+
+So in the test script we can see that it start flash loan, so we have to check the function of flash loan.
+
+```javascript
+function flashLoan(
+    IERC3156FlashBorrower receiver,
+    address _token,
+    uint256 amount,
+    bytes calldata data
+) external returns (bool) {
+    // don't loan anything.
+    if (amount == 0) revert InvalidAmount(0);
+
+    // don't loan specific token
+    if (address(asset) != _token) revert UnsupportedCurrency();
+
+    // record the balance before loan start.
+    uint256 balanceBefore = totalAssets();
+    if (convertToShares(totalSupply) != balanceBefore) revert InvalidBalance();
+    uint256 fee = flashFee(_token, amount);
+
+    // transfer tokens out + execute callback on receiver
+    ERC20(_token).safeTransfer(address(receiver), amount);
+
+    // callback must return magic value, otherwise assume it failed
+    if (receiver.onFlashLoan(msg.sender, address(asset), amount, fee, data) != keccak256("IERC3156FlashBorrower.onFlashLoan"))
+        revert CallbackFailed();
+
+    // pull amount + fee from receiver, then pay the fee to the recipient
+    ERC20(_token).safeTransferFrom(address(receiver), address(this), amount + fee);
+    ERC20(_token).safeTransfer(feeRecipient, fee);
+    return true;
+}
+```
+
