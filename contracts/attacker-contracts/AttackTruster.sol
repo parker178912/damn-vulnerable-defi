@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
 import "../truster/TrusterLenderPool.sol";
 import "../DamnValuableToken.sol";
-
 
 contract AttackTruster {
     TrusterLenderPool trust;
